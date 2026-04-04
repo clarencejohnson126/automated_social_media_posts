@@ -1,5 +1,5 @@
 .env
-batches/
 __pycache__/
 *.pyc
 .DS_Store
+*.raw.png
