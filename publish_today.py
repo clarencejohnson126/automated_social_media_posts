@@ -16,7 +16,10 @@ if BRAND not in ("rebelz-ai", "johnson-services"):
     print(f"Usage: python publish_today.py <rebelz-ai|johnson-services>")
     sys.exit(1)
 
-META_ACCESS_TOKEN = os.environ["META_ACCESS_TOKEN"]
+META_ACCESS_TOKEN = os.environ.get(
+    f"{'REBELZ' if BRAND == 'rebelz-ai' else 'JOHNSON'}_META_ACCESS_TOKEN",
+    os.environ.get("META_ACCESS_TOKEN", ""),
+)
 GRAPH_API = "https://graph.facebook.com/v21.0"
 
 BRAND_CONFIG = {
