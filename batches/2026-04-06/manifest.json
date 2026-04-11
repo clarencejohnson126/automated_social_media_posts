@@ -41,7 +41,7 @@
       },
       {
         "index": 3,
-        "scheduled_date": "2026-04-10",
+        "scheduled_date": "2026-04-12",
         "content_type": "pain_point",
         "content_label": "Schmerzpunkt",
         "target_audience": "Elektriker",
@@ -58,7 +58,7 @@
       },
       {
         "index": 4,
-        "scheduled_date": "2026-04-12",
+        "scheduled_date": "2026-04-14",
         "content_type": "branded",
         "content_label": "Über uns",
         "target_audience": "Abdichter",
@@ -75,7 +75,7 @@
       },
       {
         "index": 5,
-        "scheduled_date": "2026-04-14",
+        "scheduled_date": "2026-04-16",
         "content_type": "engagement",
         "content_label": "Mitmachen",
         "target_audience": "Dachdecker",
@@ -92,7 +92,7 @@
       },
       {
         "index": 6,
-        "scheduled_date": "2026-04-16",
+        "scheduled_date": "2026-04-18",
         "content_type": "educational",
         "content_label": "Wussten Sie schon?",
         "target_audience": "Maler",
@@ -109,7 +109,7 @@
       },
       {
         "index": 7,
-        "scheduled_date": "2026-04-18",
+        "scheduled_date": "2026-04-20",
         "content_type": "social_proof",
         "content_label": "Kundenerfolg",
         "target_audience": "Fliesenleger",
@@ -123,6 +123,57 @@
         "published": false,
         "file_path": "rebelz-ai-ig/post-07.mp4",
         "caption": "Spürst du auch den Druck, bei jedem Fliesenprojekt effizienter zu werden? ⏳ Wir kennen das! Ein erfahrener Fliesenleger aus Baden-Württemberg stand vor ähnlichen Herausforderungen: Zeitfresser bei der Planung und unsichere Materialkalkulationen.\n\nMit Rebelz AI hat er seine Angebotserstellung optimiert und die Projektplanung revolutioniert. Seine Rückmeldung spricht Bände: \"Endlich mehr Zeit für das Wesentliche und präzisere Projekte!\" Das Ergebnis: deutliche Zeitersparnis und weniger Nacharbeit. ✅\n\nMöchtest du auch deine Fliesenprojekte smarter managen und deinen Gewinn steigern? Entdecke, wie Rebelz AI dich dabei unterstützen kann.\n\nBesuche jetzt rebelzai.com und sichere dir deine kostenlose Erstberatung. Starte in eine effizientere Zukunft! 🚀\n\n#Fliesenleger #Handwerk #Bau #Digitalisierung #KünstlicheIntelligenz #Effizienz #RebelzAI #Bauwesen"
+      },
+      {
+        "index": 8,
+        "scheduled_date": "2026-04-22",
+        "content_type": "pain_point",
+        "content_label": "Schmerzpunkt (Video)",
+        "target_audience": "Bau-Subunternehmer",
+        "media_type": "video",
+        "width": 1080,
+        "height": 1080,
+        "style": "square, bold Bauhaus-inspired, heavy branding",
+        "brand": "rebelz-ai",
+        "platform": "ig",
+        "approved": true,
+        "published": false,
+        "file_path": "rebelz-ai-ig/post-08.mp4",
+        "caption": "Video: Freitag 21 Uhr Stundenzettel — das Chaos mit Aufmaßen und Nachträgen in 15 Sekunden."
+      },
+      {
+        "index": 9,
+        "scheduled_date": "2026-04-24",
+        "content_type": "pain_point",
+        "content_label": "Schmerzpunkt (Video)",
+        "target_audience": "Bau-Subunternehmer",
+        "media_type": "video",
+        "width": 1080,
+        "height": 1080,
+        "style": "square, bold Bauhaus-inspired, heavy branding",
+        "brand": "rebelz-ai",
+        "platform": "ig",
+        "approved": true,
+        "published": false,
+        "file_path": "rebelz-ai-ig/post-09.mp4",
+        "caption": "Video: 150+ WhatsApp-Nachrichten täglich? So bringt Rebelz AI Ordnung in Ihr Baustellen-Chaos."
+      },
+      {
+        "index": 10,
+        "scheduled_date": "2026-04-26",
+        "content_type": "pain_point",
+        "content_label": "Schmerzpunkt (Video)",
+        "target_audience": "Bau-Subunternehmer",
+        "media_type": "video",
+        "width": 1080,
+        "height": 1080,
+        "style": "square, bold Bauhaus-inspired, heavy branding",
+        "brand": "rebelz-ai",
+        "platform": "ig",
+        "approved": true,
+        "published": false,
+        "file_path": "rebelz-ai-ig/post-10.mp4",
+        "caption": "Video: Vorher/Nachher — von Zettelwirtschaft zu automatisierter Baudokumentation."
       }
     ],
     "rebelz-ai-fb": [
@@ -165,7 +216,7 @@
       },
       {
         "index": 3,
-        "scheduled_date": "2026-04-10",
+        "scheduled_date": "2026-04-12",
         "content_type": "pain_point",
         "content_label": "Schmerzpunkt",
         "target_audience": "Elektriker",
@@ -182,7 +233,7 @@
       },
       {
         "index": 4,
-        "scheduled_date": "2026-04-12",
+        "scheduled_date": "2026-04-14",
         "content_type": "branded",
         "content_label": "Über uns",
         "target_audience": "Abdichter",
@@ -199,7 +250,7 @@
       },
       {
         "index": 5,
-        "scheduled_date": "2026-04-14",
+        "scheduled_date": "2026-04-16",
         "content_type": "engagement",
         "content_label": "Mitmachen",
         "target_audience": "Dachdecker",
@@ -216,7 +267,7 @@
       },
       {
         "index": 6,
-        "scheduled_date": "2026-04-16",
+        "scheduled_date": "2026-04-18",
         "content_type": "educational",
         "content_label": "Wussten Sie schon?",
         "target_audience": "Maler",
@@ -233,7 +284,7 @@
       },
       {
         "index": 7,
-        "scheduled_date": "2026-04-18",
+        "scheduled_date": "2026-04-20",
         "content_type": "social_proof",
         "content_label": "Kundenerfolg",
         "target_audience": "Fliesenleger",
@@ -288,7 +339,7 @@
       },
       {
         "index": 3,
-        "scheduled_date": "2026-04-10",
+        "scheduled_date": "2026-04-12",
         "content_type": "pain_point",
         "content_label": "Schmerzpunkt",
         "target_audience": "Studenten die umziehen",
@@ -305,7 +356,7 @@
       },
       {
         "index": 4,
-        "scheduled_date": "2026-04-12",
+        "scheduled_date": "2026-04-14",
         "content_type": "branded",
         "content_label": "Über uns",
         "target_audience": "Junge Familien die umziehen",
@@ -322,7 +373,7 @@
       },
       {
         "index": 5,
-        "scheduled_date": "2026-04-14",
+        "scheduled_date": "2026-04-16",
         "content_type": "engagement",
         "content_label": "Mitmachen",
         "target_audience": "Kinder die die Wohnung ihrer Eltern auflösen",
@@ -339,7 +390,7 @@
       },
       {
         "index": 6,
-        "scheduled_date": "2026-04-16",
+        "scheduled_date": "2026-04-18",
         "content_type": "educational",
         "content_label": "Wussten Sie schon?",
         "target_audience": "Betreuer",
@@ -356,7 +407,7 @@
       },
       {
         "index": 7,
-        "scheduled_date": "2026-04-18",
+        "scheduled_date": "2026-04-20",
         "content_type": "social_proof",
         "content_label": "Kundenerfolg",
         "target_audience": "Erbgemeinschaften",
@@ -412,7 +463,7 @@
       },
       {
         "index": 3,
-        "scheduled_date": "2026-04-10",
+        "scheduled_date": "2026-04-12",
         "content_type": "pain_point",
         "content_label": "Schmerzpunkt",
         "target_audience": "Studenten die umziehen",
@@ -429,7 +480,7 @@
       },
       {
         "index": 4,
-        "scheduled_date": "2026-04-12",
+        "scheduled_date": "2026-04-14",
         "content_type": "branded",
         "content_label": "Über uns",
         "target_audience": "Junge Familien die umziehen",
@@ -446,7 +497,7 @@
       },
       {
         "index": 5,
-        "scheduled_date": "2026-04-14",
+        "scheduled_date": "2026-04-16",
         "content_type": "engagement",
         "content_label": "Mitmachen",
         "target_audience": "Kinder die die Wohnung ihrer Eltern auflösen",
@@ -463,7 +514,7 @@
       },
       {
         "index": 6,
-        "scheduled_date": "2026-04-16",
+        "scheduled_date": "2026-04-18",
         "content_type": "educational",
         "content_label": "Wussten Sie schon?",
         "target_audience": "Betreuer",
@@ -480,7 +531,7 @@
       },
       {
         "index": 7,
-        "scheduled_date": "2026-04-18",
+        "scheduled_date": "2026-04-20",
         "content_type": "social_proof",
         "content_label": "Kundenerfolg",
         "target_audience": "Erbgemeinschaften",

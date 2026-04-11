@@ -1,7 +1,7 @@
 """Content planner — decides what to post, when, and for whom."""
 
 from datetime import date, timedelta
-from config import BRANDS, CONTENT_TYPES, POSTS_PER_BATCH, POST_INTERVAL_DAYS
+from config import BRANDS, CONTENT_TYPES, POSTS_PER_BATCH, POST_INTERVAL_DAYS, VIDEO_POSITIONS
 
 
 def plan_batch(start_date: date) -> dict[str, list[dict]]:
@@ -27,8 +27,9 @@ def plan_batch(start_date: date) -> dict[str, list[dict]]:
                 else:
                     audience = brand["trades"][i % len(brand["trades"])]
 
-                # Last post in batch is video, rest are images
-                media_type = "video" if i == POSTS_PER_BATCH - 1 else "image"
+                # Video vs image decided by VIDEO_POSITIONS (1-indexed positions).
+                # Default ratio: 80% image / 20% video, distributed through the batch.
+                media_type = "video" if (i + 1) in VIDEO_POSITIONS else "image"
 
                 fmt = brand["formats"]["instagram" if platform == "ig" else "facebook"]
 

@@ -36,10 +36,14 @@ JOHNSON_WHATSAPP = os.getenv("JOHNSON_WHATSAPP", "+491621811123")
 BATCHES_DIR = PROJECT_ROOT / "batches"
 
 # --- Posting Schedule ---
+# 80% image / 20% video ratio — 10-post batches = 8 images + 2 videos
 POST_INTERVAL_DAYS = 2
-POSTS_PER_BATCH = 7
-IMAGES_PER_BATCH = 6
-VIDEOS_PER_BATCH = 1
+POSTS_PER_BATCH = 10
+IMAGES_PER_BATCH = 8
+VIDEOS_PER_BATCH = 2
+# Positions (1-indexed) where videos appear in the batch — spreads them out
+# so we don't end with two videos back-to-back.
+VIDEO_POSITIONS = [5, 10]
 
 # --- Brand Config ---
 BRANDS = {

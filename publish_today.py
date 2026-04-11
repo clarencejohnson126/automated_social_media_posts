@@ -64,14 +64,15 @@ def main():
             continue
 
         for post in posts:
-            if post["scheduled_date"] != today_str:
+            # Publish any unpublished post whose scheduled_date is today or in the past
+            # (backlog catch-up mode — guarantees missed days get published on the next run)
+            if post["scheduled_date"] > today_str:
                 continue
             if not post["approved"]:
                 print(f"  SKIP {account_key} post {post['index']}: not approved")
                 continue
             if post["published"]:
-                print(f"  SKIP {account_key} post {post['index']}: already published")
-                continue
+                continue  # silent skip — backlog scan hits a lot of these
             if not post["file_path"]:
                 print(f"  SKIP {account_key} post {post['index']}: no media file")
                 continue
@@ -114,40 +115,74 @@ def main():
                 print(f"  PUBLISHED {account_key} post {post['index']} to Facebook: {resp.json()}")
 
             elif platform == "ig" and ig_id:
-                # Upload to FB first to get public URL for IG
-                with open(media_path, "rb") as f:
-                    resp = requests.post(
-                        f"{GRAPH_API}/{page_id}/photos",
-                        files={"source": (media_path.name, f, "image/png")},
-                        data={"published": "false", "access_token": page_token},
+                if post["media_type"] == "video":
+                    # IG video via jsdelivr CDN (repo is public on GitHub)
+                    repo_path = f"batches/{batch_dir.name}/{post['file_path']}"
+                    video_url = (
+                        "https://cdn.jsdelivr.net/gh/clarencejohnson126/"
+                        f"automated_social_media_posts@main/{repo_path}"
                     )
-                resp.raise_for_status()
-                photo_id = resp.json()["id"]
+                    # Create REELS container
+                    resp = requests.post(
+                        f"{GRAPH_API}/{ig_id}/media",
+                        data={
+                            "media_type": "REELS",
+                            "video_url": video_url,
+                            "caption": caption,
+                            "access_token": META_ACCESS_TOKEN,
+                        },
+                    )
+                    resp.raise_for_status()
+                    container_id = resp.json()["id"]
+                    # Poll container status until FINISHED (videos take time to process)
+                    for _ in range(30):
+                        time.sleep(5)
+                        s = requests.get(
+                            f"{GRAPH_API}/{container_id}",
+                            params={"fields": "status_code", "access_token": META_ACCESS_TOKEN},
+                        ).json()
+                        if s.get("status_code") == "FINISHED":
+                            break
+                        if s.get("status_code") == "ERROR":
+                            raise RuntimeError(f"IG video container error: {s}")
+                    resp = requests.post(
+                        f"{GRAPH_API}/{ig_id}/media_publish",
+                        data={"creation_id": container_id, "access_token": META_ACCESS_TOKEN},
+                    )
+                    resp.raise_for_status()
+                    print(f"  PUBLISHED {account_key} post {post['index']} to Instagram (video): {resp.json()}")
+                else:
+                    # Image: upload to FB as unpublished to get a public URL, then publish on IG
+                    with open(media_path, "rb") as f:
+                        resp = requests.post(
+                            f"{GRAPH_API}/{page_id}/photos",
+                            files={"source": (media_path.name, f, "image/png")},
+                            data={"published": "false", "access_token": page_token},
+                        )
+                    resp.raise_for_status()
+                    photo_id = resp.json()["id"]
 
-                # Get public URL
-                resp = requests.get(
-                    f"{GRAPH_API}/{photo_id}",
-                    params={"fields": "images", "access_token": page_token},
-                )
-                resp.raise_for_status()
-                image_url = resp.json()["images"][0]["source"]
+                    resp = requests.get(
+                        f"{GRAPH_API}/{photo_id}",
+                        params={"fields": "images", "access_token": page_token},
+                    )
+                    resp.raise_for_status()
+                    image_url = resp.json()["images"][0]["source"]
 
-                # Create IG container
-                resp = requests.post(
-                    f"{GRAPH_API}/{ig_id}/media",
-                    data={"image_url": image_url, "caption": caption, "access_token": META_ACCESS_TOKEN},
-                )
-                resp.raise_for_status()
-                container_id = resp.json()["id"]
+                    resp = requests.post(
+                        f"{GRAPH_API}/{ig_id}/media",
+                        data={"image_url": image_url, "caption": caption, "access_token": META_ACCESS_TOKEN},
+                    )
+                    resp.raise_for_status()
+                    container_id = resp.json()["id"]
 
-                # Publish IG container
-                time.sleep(5)
-                resp = requests.post(
-                    f"{GRAPH_API}/{ig_id}/media_publish",
-                    data={"creation_id": container_id, "access_token": META_ACCESS_TOKEN},
-                )
-                resp.raise_for_status()
-                print(f"  PUBLISHED {account_key} post {post['index']} to Instagram: {resp.json()}")
+                    time.sleep(5)
+                    resp = requests.post(
+                        f"{GRAPH_API}/{ig_id}/media_publish",
+                        data={"creation_id": container_id, "access_token": META_ACCESS_TOKEN},
+                    )
+                    resp.raise_for_status()
+                    print(f"  PUBLISHED {account_key} post {post['index']} to Instagram (image): {resp.json()}")
 
             post["published"] = True
             published_any = True

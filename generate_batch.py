@@ -7,6 +7,7 @@ from config import BATCHES_DIR
 from batch_manager import create_batch, send_whatsapp_reminder, load_manifest, save_manifest
 from caption_writer import write_captions_for_batch
 from creative_generator import generate_images_for_batch
+from render_videos import render_for_post
 
 
 def main():
@@ -48,8 +49,29 @@ def main():
     if remaining > 0:
         print(f"  {remaining} images remaining — run again tomorrow.")
 
-    # Step 4: Send WhatsApp reminder
-    print("[4/4] Sending WhatsApp reminder...")
+    # Step 4: Render videos via Remotion (one variant per video slot per account)
+    print("[4/5] Rendering videos (Remotion)...")
+    manifest = load_manifest(batch_dir)
+    for account_key, posts in manifest["accounts"].items():
+        video_slots = [p for p in posts if p["media_type"] == "video"]
+        for variant_index, p in enumerate(video_slots):
+            brand = p["brand"]
+            platform = p["platform"]
+            out_rel = f"{account_key}/post-{p['index']:02d}.mp4"
+            out_abs = batch_dir / out_rel
+            if out_abs.exists():
+                print(f"  skip {out_rel} (exists)")
+                p["file_path"] = out_rel
+                continue
+            try:
+                render_for_post(brand, platform, out_abs, variant_index)
+                p["file_path"] = out_rel
+            except Exception as e:
+                print(f"  ❌ failed {out_rel}: {e}")
+    save_manifest(batch_dir, manifest)
+
+    # Step 5: Send WhatsApp reminder
+    print("[5/5] Sending WhatsApp reminder...")
     send_whatsapp_reminder(batch_dir)
 
     print()
