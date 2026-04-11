@@ -1,5 +1,16 @@
-"""Creative generator — Gemini image generation with brand-specific prompts."""
+"""Creative generator — Gemini image generation with brand-specific prompts.
 
+Rewritten 2026-04-11 after Clarence's feedback that Johnson images were
+visually identical (same female caregiver + elderly woman in living room,
+repeating). See CLAUDE.md in this directory for the full creative rules.
+
+Core principle: every post in a batch MUST use a DIFFERENT visual scene
+category (A–J) AND a different visual style. We enforce this by rotating
+categories by post index, not by random.choice() — randomness allowed the
+model to converge on the same scene type.
+"""
+
+import random
 import time
 from pathlib import Path
 from google import genai
@@ -11,104 +22,212 @@ def _get_client():
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
-import random
+# ─────────────────────────────────────────────────────────────────────────
+# 10 VISUAL SCENE CATEGORIES (see CLAUDE.md — rotate through these per batch)
+# ─────────────────────────────────────────────────────────────────────────
+# Each category has Johnson-specific and Rebelz-specific scene prompts.
+# The generator picks category by (post_index % 10), so a batch of 10 posts
+# gets exactly one of each. Within a category, we pick a variant that
+# matches the ICP.
 
-# Visual variety pools — each post gets a DIFFERENT scene/style combo
-_REBELZ_SCENES = {
-    "Trockenbauer": [
-        "Nahaufnahme von Händen die präzise eine Gipskartonplatte zuschneiden, Staub in der Luft, dramatisches Seitenlicht",
-        "Fertiger Raum mit perfekt verputzten Wänden, warmes Licht fällt durch ein Fenster, der Handwerker lehnt stolz an der Wand",
-        "Vogelperspektive auf einen Grundriss mit Werkzeug und Tablet daneben, flache Komposition, minimalistisch",
-        "Zwei Handwerker besprechen einen Plan auf einer Baustelle, einer zeigt auf ein Tablet, professionelle Teamarbeit",
+SCENE_CATEGORIES = [
+    "A_hero_team_action",
+    "B_process_bts",
+    "C_transformation",
+    "D_human_moment",
+    "E_abstract_flatlay",
+    "F_data_stats_card",
+    "G_text_first_poster",
+    "H_environment_regional",
+    "I_documentary_flash",
+    "J_aerial_topdown",
+]
+
+# Human-readable labels passed to Gemini in the prompt. The internal ID
+# (e.g. "F_data_stats_card") must NEVER appear in the prompt directly
+# because Gemini will sometimes render it as visible text on the image.
+CATEGORY_LABELS = {
+    "A_hero_team_action":    "Hero-/Team-Aktionsshot",
+    "B_process_bts":         "Prozess-/Behind-the-Scenes-Detail",
+    "C_transformation":      "Vorher-/Nachher-Transformation",
+    "D_human_moment":        "Authentischer menschlicher Moment",
+    "E_abstract_flatlay":    "Abstraktes Flatlay / symbolische Komposition",
+    "F_data_stats_card":     "Daten-/Statistik-Karte mit großer Zahl",
+    "G_text_first_poster":   "Typografie-Poster mit Headline als Hero",
+    "H_environment_regional":"Umgebungs-/Stadtansicht mit regionalem Bezug",
+    "I_documentary_flash":   "Dokumentarischer Direkt-Blitz-Stil",
+    "J_aerial_topdown":      "Drohnen-/Top-Down-Perspektive",
+}
+
+# ─────────────────────────────────────────────────────────────────────────
+# JOHNSON SERVICES — scenes per category (do NOT reuse the old living-room
+# caregiver scene — that's the visual fatigue we're fixing)
+# ─────────────────────────────────────────────────────────────────────────
+
+JOHNSON_SCENES = {
+    "A_hero_team_action": [
+        "Gebrandeter weißer Johnson-Services-Kastenwagen mit blauem Logo steht vor dem Mannheimer Wasserturm zur goldenen Stunde, ein Teammitglied in königsblauem Polo öffnet die Hecktür, kraftvolle Heldenkomposition",
+        "Drei-Personen-Team in königsblauen Johnson-Services-Shirts schlägt grinsend ein: Einer hält ein Klemmbrett, der andere trägt einen professionellen Faltkarton, der dritte zeigt ein OK-Zeichen, Ganzkörperporträt vor einem Heidelberger Altbau",
+        "Close-Up einer behandschuhten Hand, die mit schwarzem Marker 'KÜCHE – ZERBRECHLICH' auf einen ordentlichen braunen Karton schreibt, im Hintergrund unscharf ein Team bei der Arbeit",
     ],
-    "Bodenleger": [
-        "Detailaufnahme von elegant verlegtem Parkettboden mit Spiegelung, künstlerische Perspektive von unten",
-        "Vorher-Nachher Split: links alter kaputter Boden, rechts frisch verlegtes Parkett, scharfe Trennlinie",
-        "Handwerker kniet auf fertigem Boden und prüft die Qualität, Fokus auf seine prüfenden Hände",
-        "Verschiedene Bodenbeläge als Muster angeordnet wie ein Kunstwerk, Flatlay-Stil von oben",
+    "B_process_bts": [
+        "Makroaufnahme zweier Hände, die ein filigranes Porzellan-Erinnerungsstück mit gebogenem Kraftpapier umwickeln, warmes goldenes Fensterlicht, dokumentarischer Stil, sehr geringe Schärfentiefe",
+        "Bewegungsunschärfe-Aufnahme eines Teams, das einen Karton im Treppenhaus eines Jugendstilhauses weiterreicht, dynamisch, authentisch, leicht körnig",
+        "Overhead-Blick auf einen Küchentisch, auf dem jemand professionelle Umzugsmaterialien sortiert: Rollen mit Noppenfolie, blaue Johnson-Services-Kartons, Klebeband, Edding, alles exakt ausgerichtet",
     ],
-    "Elektriker": [
-        "Modernes Smart-Home Panel an der Wand, blaue LED-Lichter, futuristisch und clean",
-        "Sauberer Sicherungskasten nach der Arbeit, alles perfekt beschriftet, professionelle Ordnung",
-        "Elektriker mit Tablet steuert Gebäudeautomation, Bildschirm leuchtet, moderne Technologie",
-        "Kabelstränge kunstvoll und ordentlich verlegt, fast wie ein Kunstwerk, Makro-Aufnahme",
+    "C_transformation": [
+        "Vorher/Nachher-Split-Screen (vertikal getrennt durch feine weiße Linie): links ein überfülltes Dachgeschoss mit Staub und Kisten, rechts das gleiche Dachgeschoss komplett leer, frisch gefegt, Sonnenlicht strömt durch die Dachfenster",
+        "Vorher/Nachher eines Garagenraums: links vollgestellt mit Gerümpel, rechts blitzsauber und leer, gleicher Kamerawinkel, gleiches Licht",
+        "Ein einzelnes Foto: leerer, gefegter Raum mit einem einzigen letzten Karton in der Mitte, durch die Fenster flutet weiches Nachmittagslicht, cinematische Stimmung",
     ],
-    "Abdichter": [
-        "Flachdach bei Sonnenuntergang, frische Abdichtung glänzt, dramatischer Himmel",
-        "Nahaufnahme einer perfekten Naht bei einer Kellerabdichtung, Wassertropfen perlen ab",
-        "Handwerker arbeitet auf einem Dach mit Stadtpanorama im Hintergrund, epische Perspektive",
-        "Querschnitt-Illustration einer Gebäudeabdichtung, technisch aber visuell ansprechend",
+    "D_human_moment": [
+        "Ehrliches Porträt eines Betreuers mittleren Alters (männlich, Sie-Form-Typ) mit sichtbarer Erleichterung im Gesicht, der vor der Tür seines Betreuten steht, natürliches Fensterlicht, dokumentarischer Stil",
+        "Junger Student Mitte 20 lacht ehrlich, während er den letzten Karton in einen Kleintransporter in einer Heidelberger Altstadtstraße schiebt, sonniger Vormittag",
+        "Elegante ältere Frau Anfang 70 reicht einem Johnson-Services-Teamleiter lächelnd die Hand, Fokus auf den Handschlag, weicher Hintergrund",
     ],
-    "Dachdecker": [
-        "Dachlandschaft von oben, verschiedene Ziegel in Mustern, grafisch und ästhetisch",
-        "Handwerker auf einem Dach mit Bergpanorama im Hintergrund, heroische Pose",
-        "Nahaufnahme von Dachziegeln mit Regentropfen, die perfekt abperlen, Makro-Fotografie",
-        "Historisches vs. modernes Dach nebeneinander, Kontrast zwischen Tradition und Innovation",
+    "E_abstract_flatlay": [
+        "Flat Lay von oben auf einem neutralen Leinenhintergrund: ein Bund Schlüssel, eine Umzugscheckliste mit deutschem Text, ein blauer Johnson-Services-Kugelschreiber, eine Tasse schwarzer Kaffee, alles geometrisch angeordnet, magazinreif",
+        "Flat Lay von oben: ein Grundriss einer Wohnung, darüber ein Metermaß und ein paar Schlüssel arrangiert, clean minimalistisch auf weißem Holzboden",
+        "Symbolisches Bild: eine offene Tür, durch die Licht strömt, und auf der Schwelle ein einzelner kleiner Karton mit dem Wort 'NEUANFANG' drauf",
     ],
-    "Maler": [
-        "Farbfächer und Pinsel arrangiert als Flatlay, eine Hand wählt eine Farbe, elegant",
-        "Halb gestrichene Wand: vorher grau, nachher leuchtend, dramatischer Farbkontrast",
-        "Nahaufnahme von Farbroller auf frischer Wand, cremige Textur, sinnliches Detail",
-        "Fertig gestrichener Raum mit perfekten Kanten und Linien, Sonnenlicht fällt herein",
+    "F_data_stats_card": [
+        "Poster-artiges Design: riesige Zahl '147' in fetter DM-Sans auf tiefblauem Hintergrund (#005b8c), darunter kleiner weißer Text 'zufriedene Kunden im Rhein-Neckar-Raum', unten rechts dezentes Johnson-Services-Logo",
+        "Statistik-Karte: '48 Stunden' in gewaltiger weißer Schrift auf blauem Grund, darunter 'von Chaos zu leerer Wohnung', schlichtes Grafik-Design",
+        "Testimonial-Karte: großes Anführungszeichen, darunter ein kurzes Zitat auf Deutsch ('Schneller als ich dachte. Und sauber.'), Name eines Kunden aus Mannheim, clean Bauhaus-Layout",
     ],
-    "Fliesenleger": [
-        "Mosaik-Muster in einem luxuriösen Badezimmer, elegante Perspektive",
-        "Nahaufnahme einer perfekten Fuge, geometrische Perfektion, minimalistisch",
-        "Handwerker schneidet präzise eine Fliese mit einer Nassschneidemaschine, Wasser spritzt",
-        "Fertiges Badezimmer mit aufwändigem Fliesenmuster, Magazin-Qualität",
+    "G_text_first_poster": [
+        "Fetter deutscher Typografie-Poster-Stil: 'ENTRÜMPELUNG IN 48 STUNDEN' in riesiger DM-Sans-Schrift auf limettengrünem Akzent-Hintergrund (#9DFF20), schwarze Schrift, ein einziges kleines blaues Element als Kontrast",
+        "Minimaler Poster: 'WIR KÜMMERN UNS UM ALLES.' in weißer Schrift auf tief dunkelblauem Grund, nichts sonst außer dem dezenten Logo unten",
+        "Frage-Poster-Stil: 'WOHIN MIT OMAS ALTEM SCHRANK?' in großer bold Schrift auf cremeweißem Grund, darunter winzig 'Wir schon.' mit Logo",
+    ],
+    "H_environment_regional": [
+        "Skyline von Frankfurt am Main in der Dämmerung, im Vordergrund unscharf die Heckklappe eines Johnson-Services-Vans mit sichtbarem Logo, epische Perspektive",
+        "Schmale Heidelberger Altstadtgasse am frühen Morgen, ein Johnson-Services-Team trägt Kartons zu einem Haus, authentische Straßenszene",
+        "Weite Aufnahme des Mannheimer Wasserturms bei blauer Stunde, im Vordergrund das Johnson-Services-Logo auf einem Fahrzeug, grafisch und regional unverwechselbar",
+    ],
+    "I_documentary_flash": [
+        "Direkter Blitz, nächtliche Straßenszene in Mannheim-Jungbusch, ein Team lädt den letzten Karton in den Van, rohe dokumentarische Ästhetik, leicht gritty",
+        "Kandid-Paparazzi-Ästhetik mit hartem Blitz: zwei Teammitglieder stehen rauchend vor einem Frankfurter Altbau, eine ehrliche Pause in einem langen Arbeitstag",
+        "Flash-Fotografie im Inneren einer halb geräumten Wohnung, Team in Aktion, wirft scharfe Schatten, roh und echt",
+    ],
+    "J_aerial_topdown": [
+        "Drohnenperspektive direkt von oben auf einen vollständig beladenen Johnson-Services-Van mit offenen Türen, Kartons wie Tetris gepackt, sichtbare regionale Straßenmarkierungen",
+        "Bird's-eye-view auf einen leeren Dielenboden eines Raumes mit nur einem Metermaß, einem Schlüsselbund und einem Grundriss — grafisch und minimal",
+        "Top-down-Aufnahme eines Stapels sauberer weißer Umzugskartons auf dem Gehweg vor einem Heidelberger Altbau, Sonnenlicht, fast wie eine Installation",
     ],
 }
 
-_JOHNSON_SCENES = {
-    "Betreuer": [
-        "Leerer, sauberer Raum nach einer Entrümpelung mit Sonnenlicht, Neuanfang-Stimmung",
-        "Freundlicher Helfer übergibt Schlüssel an eine erleichterte ältere Person, warmherzige Szene",
-        "Ordentlich sortierte Umzugskartons mit Beschriftung, alles organisiert und professionell",
-        "Team in blauen Shirts trägt vorsichtig Möbel die Treppe hinunter, Teamwork",
+# ─────────────────────────────────────────────────────────────────────────
+# REBELZ AI — scenes per category
+# ─────────────────────────────────────────────────────────────────────────
+
+REBELZ_SCENES = {
+    "A_hero_team_action": [
+        "Trockenbauer auf einer Baustelle in Arbeitskleidung, konzentriert, mit einem Tablet in der Hand, im Hintergrund unscharfe Trockenbauwände, Heldenporträt",
+        "Elektriker mit Tablet vor einem modernen Sicherungskasten, LEDs glimmen blau, futuristische Atmosphäre",
+        "Dachdecker auf einem steilen Dach mit Stadtpanorama, heroische Pose gegen dramatischen Abendhimmel",
     ],
-    "Erbgemeinschaften": [
-        "Altes Haus wird ausgeräumt, Mix aus Nostalgie und Aufbruch, warmes Licht",
-        "Alte Fotos und Erinnerungsstücke sorgfältig in Kisten verpackt, respektvoller Umgang",
-        "Leeres Zimmer mit Sonnenlicht und einem letzten Umzugskarton, poetische Stimmung",
-        "Professionelles Team vor einem Haus, bereit zum Anpacken, vertrauenswürdig",
+    "B_process_bts": [
+        "Makroaufnahme einer präzise gezogenen Fliesenfuge, Wassertropfen perlen ab, hochauflösendes Detail",
+        "Nahaufnahme einer Hand, die mit Bleistift und Maßband präzise Maße auf einem Bauplan notiert, warmes Seitenlicht",
+        "Farbroller wird über eine halb gestrichene Wand gezogen, cremige Textur, sinnliches Detail",
     ],
-    "Studenten die umziehen": [
-        "Junger Mensch in neuem WG-Zimmer, erste Kiste wird ausgepackt, Vorfreude",
-        "Kleintransporter vor einem Altbau, Umzugshelfer tragen Kartons, urbane Szene",
-        "Chaotisches vs. aufgeräumtes Zimmer Split-Screen, humorvoller Kontrast",
-        "Studentin sitzt glücklich auf dem Boden ihrer neuen leeren Wohnung, Smartphone in der Hand",
+    "C_transformation": [
+        "Vorher/Nachher einer Wohnzimmerwand: links staubig und unverputzt, rechts frisch gestrichen und elegant",
+        "Split-Screen: links ein chaotischer Stapel Papierzettel und Notizen, rechts ein sauberes iPad-Dashboard mit denselben Daten digital erfasst",
+        "Vorher/Nachher eines Badezimmers: links alte Fliesen, rechts perfekt verlegtes Mosaik, gleicher Winkel",
     ],
-    "junge Familien": [
-        "Familie steht vor neuem Haus mit Umzugskartons, Kind hält Teddy, glücklicher Moment",
-        "Kinderzimmer wird eingerichtet, bunte Kisten, fröhliche Atmosphäre",
-        "Eltern und Kind malen zusammen die Wand im neuen Zuhause, familiärer Moment",
-        "Umzugshelfer tragen Kinderbett ins Haus, Familie schaut dankbar zu",
+    "D_human_moment": [
+        "Ehrliches Porträt eines Dachdeckers mittleren Alters mit Stolz und Erschöpfung im Gesicht nach Feierabend, dokumentarisch",
+        "Zwei Handwerker lachen ehrlich auf einer Kaffeepause auf einer Baustelle, echt und warm",
+        "Handwerker zeigt seinem Sohn oder Lehrling etwas auf einem Bauplan, lehrende Geste, fokussiert",
     ],
-    "Kinder die Eltern-Wohnung auflösen": [
-        "Erwachsenes Kind packt sorgsam Erinnerungsstücke ein, emotionaler aber positiver Moment",
-        "Leere Wohnung mit letztem Karton und einem Bilderrahmen, würdevoller Abschied",
-        "Professioneller Helfer berät eine Person mittleren Alters, einfühlsam und kompetent",
-        "Altes Möbelstück wird vorsichtig auf einen LKW geladen, sorgfältiger Umgang",
+    "E_abstract_flatlay": [
+        "Flat Lay von oben: Maßband, Wasserwaage, Bleistift, Notizblock, Kaffee, perfekt geometrisch auf einer Holzfläche",
+        "Grafische Komposition: verschiedene Werkzeuge aus der Vogelperspektive, fast wie ein Stillleben, magazinreif",
+        "Symbolisches Bild: ein Schlüssel, ein Bauplan und ein Kaffeebecher arrangiert auf einem Tisch, warmer Morgen",
+    ],
+    "F_data_stats_card": [
+        "Poster-Stil: riesige Zahl '12 STUNDEN' in fetter Playfair-Display auf schwarzem Grund, darunter 'pro Woche gespart — dank Rebelz AI', weiß",
+        "Statistik-Karte: '68 %' in gewaltiger weißer Schrift, darunter 'weniger Büroarbeit für Trockenbauer', minimal",
+        "Testimonial-Karte: großes Zitat, darunter Name eines Handwerksmeisters und sein Gewerk, Bauhaus-Layout",
+    ],
+    "G_text_first_poster": [
+        "Fetter Poster-Stil: 'STUNDENZETTEL? GELÖST.' in riesiger Playfair Display auf tiefschwarzem Grund, weiß",
+        "Minimal-Poster: 'NACHTRÄGE VERGESSEN KOSTET €3.400.' in weißer Schrift auf schwarzem Grund, sonst nichts",
+        "Frage-Poster: 'WARUM MACHEN SIE IHRE BÜROARBEIT NOCH IMMER HANDSCHRIFTLICH?' bold schwarz auf weiß",
+    ],
+    "H_environment_regional": [
+        "Baustelle in Mannheim bei Dämmerung, im Vordergrund ein Handwerker mit Tablet, im Hintergrund Kräne gegen den Himmel",
+        "Frankfurter Bankenviertel-Skyline mit einem Gerüstarbeiter in Hochposition im Vordergrund",
+        "Typische deutsche Kleinstadt-Baustelle an einem Altbau, authentisch und regional verankert",
+    ],
+    "I_documentary_flash": [
+        "Direkter Blitz, nächtliche Baustelle, ein Handwerker räumt seine Werkzeuge zusammen, gritty",
+        "Flash-Aufnahme im Inneren einer Rohbauwohnung, Team in Aktion, harte Schatten, ungeschönt",
+        "Kandid-Stil mit Blitz: ein Elektriker prüft eine Verdrahtung, ehrlich und fokussiert",
+    ],
+    "J_aerial_topdown": [
+        "Drohnenperspektive direkt von oben auf ein Dach, auf dem Dachdecker arbeiten, grafisch klare Komposition",
+        "Top-down auf einen Werkzeugkasten, der perfekt organisiert ist, fast wie eine Installation",
+        "Bird's-eye auf einen Baustellen-Parkplatz mit Handwerker-Fahrzeugen in Reihe, regional und authentisch",
     ],
 }
 
-_REBELZ_VISUAL_STYLES = [
-    "Hochkontrast Schwarz-Weiß, körnige Textur wie analoges Film-Foto",
-    "Clean minimalistisch, viel Weißraum, ein starkes zentrales Element",
-    "Dramatisches Chiaroscuro-Licht, tiefe Schatten, ein Highlight",
-    "Grafisch-geometrisch, Bauhaus-Linien überlagert auf Foto, modern",
-    "Dokumentar-Stil, authentisch, wie aus einem Architektur-Magazin",
-    "Duotone Schwarz-Weiß mit einem einzelnen farbigen Akzent-Element",
+# ─────────────────────────────────────────────────────────────────────────
+# VISUAL TREATMENTS — one per scene (rotated independently)
+# ─────────────────────────────────────────────────────────────────────────
+
+TREATMENTS = [
+    "goldene Stunde, warmes seitliches Licht",
+    "helles Tageslicht, klare Schatten",
+    "Studio-Weiß, gleichmäßig ausgeleuchtet",
+    "moody dunkel mit einem einzelnen Lichtakzent",
+    "leuchtende Farbblöcke im Bauhaus-Stil",
+    "monochrom, körniger Film-Look",
+    "direkter harter Kamerablitz, dokumentarisch",
+    "blaue Stunde / Dämmerung, cinematisch",
 ]
 
-_JOHNSON_VISUAL_STYLES = [
-    "Warm und einladend, weiches natürliches Licht, Lifestyle-Fotografie",
-    "Clean und professionell, helle Farben, vertrauenswürdig",
-    "Emotional und nahbar, Fokus auf Gesichter und Momente",
-    "Modern und frisch, klare Linien, positive Energie",
-    "Dokumentar-Stil aber freundlich, echte Situationen, authentisch",
-    "Magazin-Qualität, perfekt inszeniert aber natürlich wirkend",
+REGIONAL_CITIES_JOHNSON = [
+    "Mannheim", "Heidelberg", "Ludwigshafen", "Weinheim", "Speyer",
+    "Frankfurt", "Darmstadt", "Wiesbaden", "Offenbach", "Mainz",
 ]
+
+# Hard negative constraints — Gemini must NOT produce these
+NEGATIVE_CONSTRAINTS_JOHNSON = """
+VERMEIDE UNBEDINGT (diese Kompositionen haben zu Creative-Fatigue geführt):
+- KEINE junge Pflegerin in blauem Poloshirt mit weißhaariger älterer Frau
+- KEINE Szene in einem Wohnzimmer mit Bücherregal und beschrifteten Kartons "FOTOS/BÜCHER/WOHNZIMMER"
+- KEIN Stock-Foto-Look von zwei Frauen sortieren Erinnerungsstücke
+- KEINE generische Shutterstock-Ästhetik
+- KEIN englischer Text im Bild
+"""
+
+NEGATIVE_CONSTRAINTS_REBELZ = """
+VERMEIDE UNBEDINGT:
+- KEIN generischer Bauarbeiter mit Bohrmaschine im Stock-Foto-Stil
+- KEIN englischer Text im Bild
+- KEIN übertrieben gestellter Werbefoto-Look
+"""
+
+
+def _pick_category(post_index: int) -> str:
+    """Scene category is DETERMINED by post index — not random.
+
+    This guarantees that a 10-post batch uses all 10 categories exactly once
+    and a 5-post batch uses 5 distinct categories.
+    """
+    return SCENE_CATEGORIES[(post_index - 1) % len(SCENE_CATEGORIES)]
+
+
+def _pick_scene(brand: str, category: str, target_audience: str) -> str:
+    pool = JOHNSON_SCENES if brand == "johnson-services" else REBELZ_SCENES
+    # target_audience could be used to further narrow down in the future
+    variants = pool.get(category, [])
+    if not variants:
+        variants = list(pool.values())[0]
+    return random.choice(variants)
 
 
 def build_image_prompt(
@@ -116,47 +235,59 @@ def build_image_prompt(
     platform: str,
     content_type: str,
     target_audience: str,
+    post_index: int,
 ) -> str:
-    """Build a Gemini image generation prompt for a specific post."""
+    """Build a Gemini image generation prompt for a specific post.
+
+    post_index (1-based) drives visual category rotation so no two posts
+    in a batch end up with the same scene type.
+    """
     brand_config = BRANDS[brand]
     fmt = brand_config["formats"]["instagram" if platform == "ig" else "facebook"]
 
+    category = _pick_category(post_index)
+    category_label = CATEGORY_LABELS[category]
+    scene = _pick_scene(brand, category, target_audience)
+    treatment = TREATMENTS[(post_index - 1) % len(TREATMENTS)]
+
     if brand == "rebelz-ai":
-        scenes = _REBELZ_SCENES.get(target_audience, list(_REBELZ_SCENES.values())[0])
-        scene = random.choice(scenes)
-        style = random.choice(_REBELZ_VISUAL_STYLES)
-        brand_style = f"""Szene: {scene}
-Visueller Stil: {style}
-Farben: Schwarz (#000000) und Weiß (#FFFFFF).
-Branding: Kleines stilisiertes 'R' Logo in einer Ecke, dezent.
-Text auf dem Bild: Kurze deutsche Headline (max 5 Wörter), groß und bold, Playfair Display Schrift.
-Optional: Eine kurze Subline (max 8 Wörter).
-KEIN englischer Text. KEIN generischer Stock-Foto-Look. Muss einzigartig und markant sein."""
-    else:
-        scenes = _JOHNSON_SCENES.get(target_audience, list(_JOHNSON_SCENES.values())[0])
-        scene = random.choice(scenes)
-        style = random.choice(_JOHNSON_VISUAL_STYLES)
-        brand_style = f"""Szene: {scene}
-Visueller Stil: {style}
-Farben: Blau (#005b8c) und Weiß (#FFFFFF), optional Akzent Lime (#9DFF20).
-Branding: Johnson Services dezent eingebunden.
-Text auf dem Bild: Kurze deutsche Headline (max 6 Wörter), DM Sans Schrift, bold.
-Optional: Eine kurze Subline.
-KEIN englischer Text. Echte, authentische Szene — KEIN generischer Stock-Foto-Look."""
+        brand_block = f"""Szene: {scene}
+Visuelle Behandlung: {treatment}
+Farben: Schwarz (#000000) und Weiß (#FFFFFF). Alles andere ist Akzent.
+Branding: Kleines stilisiertes 'R' Logo dezent in einer Ecke.
+Text im Bild: Kurze deutsche Headline (max 5 Wörter), bold Playfair Display, groß und selbstbewusst.
+Stimme: Formelle Ihr-Form. Direkt, schmerzpunktbezogen.
 
-    return f"""Erstelle ein einzigartiges Social-Media-Bild.
+{NEGATIVE_CONSTRAINTS_REBELZ}
+"""
+    else:  # johnson-services
+        city_hint = random.choice(REGIONAL_CITIES_JOHNSON)
+        brand_block = f"""Szene: {scene}
+Visuelle Behandlung: {treatment}
+Farben: Tiefblau (#005b8c) und Weiß (#FFFFFF), optional Lime-Akzent (#9DFF20).
+Branding: Johnson Services Logo dezent aber erkennbar eingebunden.
+Text im Bild (falls vorhanden): Kurze deutsche Headline (max 6 Wörter), bold DM Sans.
+Regionale Verankerung: Wenn ein Ort im Bild angedeutet werden kann, dann im Raum {city_hint} / Rhein-Neckar oder Rhein-Main.
+Stimme: Empathisch, vertrauenswürdig — Zuverlässig, Sauber, Günstig.
 
-Größe: {fmt['width']}x{fmt['height']} Pixel.
-Format: {fmt['style']}.
+{NEGATIVE_CONSTRAINTS_JOHNSON}
+"""
 
-{brand_style}
+    return f"""Erstelle ein einzigartiges, hochwertiges Social-Media-Bild.
 
+Zielformat: {fmt['width']}x{fmt['height']} Pixel ({fmt['style']}).
+Visueller Bildtyp: {category_label}
+Inhaltstyp: {content_type}
 Zielgruppe: {target_audience}
-Content-Typ: {content_type}
 
-WICHTIG: Das Bild muss sich DEUTLICH von typischen Handwerker-Stock-Fotos unterscheiden.
-Keine generischen Bauarbeiter-mit-Bohrmaschine Bilder. Sei kreativ und überraschend.
-Alle Texte auf dem Bild MÜSSEN auf Deutsch sein."""
+{brand_block}
+
+WICHTIG:
+- Das Bild MUSS sich visuell deutlich von den bisherigen Posts unterscheiden.
+- Der Bildtyp oben ist Leitfaden — NICHT als Text im Bild darstellen.
+- Keine internen Codes, Kategorie-IDs oder Beschriftungen im Bild sichtbar machen.
+- Jegliche sichtbaren Textelemente MÜSSEN auf Deutsch sein und aussagekräftig zur Szene passen.
+- Authentisch, nicht Stock-Foto-mäßig."""
 
 
 def generate_image(
@@ -164,11 +295,12 @@ def generate_image(
     platform: str,
     content_type: str,
     target_audience: str,
+    post_index: int,
     output_path: Path,
 ) -> bool:
     """Generate a single image using Gemini and save to output_path."""
     client = _get_client()
-    prompt = build_image_prompt(brand, platform, content_type, target_audience)
+    prompt = build_image_prompt(brand, platform, content_type, target_audience, post_index)
 
     try:
         response = client.models.generate_content(
@@ -193,7 +325,9 @@ def generate_image(
         if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
             print("Rate limited, waiting 30s...")
             time.sleep(30)
-            return generate_image(brand, platform, content_type, target_audience, output_path)
+            return generate_image(
+                brand, platform, content_type, target_audience, post_index, output_path
+            )
         print(f"ERROR generating {output_path.name}: {e}")
         return False
 
@@ -223,6 +357,7 @@ def generate_images_for_batch(batch: dict, batch_dir: Path) -> dict:
                 platform=post["platform"],
                 content_type=post["content_type"],
                 target_audience=post["target_audience"],
+                post_index=post["index"],
                 output_path=output_path,
             )
 
