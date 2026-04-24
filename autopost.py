@@ -45,6 +45,23 @@ if not (TOKEN and PAGE_ID and IG_ID):
 GRAPH = "https://graph.facebook.com/v21.0"
 MIN_HOURS_BETWEEN_POSTS = 30  # every-2-days cadence that tolerates any post-time-of-day vs fixed daily cron
 
+TELEGRAM_URL = "http://91.98.147.211:9090/send/telegram"
+TELEGRAM_AUTH = "bf71c2011c1405018890ad934d2b6d3e16da728761dd1aaf6a38e42835a7da4d"
+TELEGRAM_CHAT = "1051747418"
+
+
+def notify(text: str) -> None:
+    """Best-effort push to Clarence's Telegram. Never raises."""
+    try:
+        requests.post(
+            TELEGRAM_URL,
+            headers={"Authorization": f"Bearer {TELEGRAM_AUTH}", "Content-Type": "application/json"},
+            json={"to": TELEGRAM_CHAT, "message": text},
+            timeout=15,
+        )
+    except Exception as e:
+        print(f"notify failed (non-fatal): {e}")
+
 # Fixed reference date so post_index is stable across runs.
 POST_INDEX_REF_DATE = date(2026, 4, 22)
 
@@ -157,6 +174,7 @@ def main() -> None:
         age_h = (now - last).total_seconds() / 3600
         if age_h < MIN_HOURS_BETWEEN_POSTS:
             print(f"[{BRAND}] SKIP — last post {age_h:.1f}h ago (< {MIN_HOURS_BETWEEN_POSTS}h)")
+            notify(f"⏭ {BRAND} skip — last post {age_h:.1f}h ago (waiting for {MIN_HOURS_BETWEEN_POSTS}h)")
             return
         print(f"[{BRAND}] Last post {age_h:.1f}h ago — proceeding.")
     else:
@@ -201,7 +219,21 @@ def main() -> None:
         print(f"[{BRAND}] IG published: {ig_res}")
 
     print(f"\n[{BRAND}] SUCCESS fb_post_id={fb_res.get('post_id')} ig_media_id={ig_res.get('id')}")
+    notify(
+        f"✅ {BRAND} posted to FB+IG\n"
+        f"audience: {audience}\n"
+        f"content: {content_type}\n"
+        f"fb: {fb_res.get('post_id')}\n"
+        f"ig: {ig_res.get('id')}"
+    )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(tb)
+        notify(f"❌ {BRAND} autopost FAILED\n{type(e).__name__}: {e}\n\n{tb[-1500:]}")
+        raise
