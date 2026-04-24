@@ -43,7 +43,7 @@ if not (TOKEN and PAGE_ID and IG_ID):
     sys.exit(1)
 
 GRAPH = "https://graph.facebook.com/v21.0"
-MIN_HOURS_BETWEEN_POSTS = 40  # every-2-days cadence with 8h of slack for cron drift
+MIN_HOURS_BETWEEN_POSTS = 30  # every-2-days cadence that tolerates any post-time-of-day vs fixed daily cron
 
 # Fixed reference date so post_index is stable across runs.
 POST_INDEX_REF_DATE = date(2026, 4, 22)
