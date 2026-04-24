@@ -82,13 +82,19 @@ CONTENT_TYPES = ["educational", "social_proof", "pain_point", "branded", "engage
 
 
 def get_page_token(page_id: str) -> str:
+    """Return a page-scoped token. Falls back to TOKEN if the exchange is denied
+    (e.g. TOKEN is already a page token, or lacks pages_manage_metadata)."""
     r = requests.get(
         f"{GRAPH}/{page_id}",
         params={"fields": "access_token", "access_token": TOKEN},
         timeout=30,
     )
+    if r.status_code == 403 or r.status_code == 400:
+        print(f"[{BRAND}] get_page_token: exchange returned {r.status_code} — using TOKEN directly as page token")
+        return TOKEN
     r.raise_for_status()
-    return r.json()["access_token"]
+    data = r.json()
+    return data.get("access_token", TOKEN)
 
 
 def last_post_ts() -> datetime | None:
