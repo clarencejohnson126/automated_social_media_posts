@@ -45,22 +45,49 @@ if not (TOKEN and PAGE_ID and IG_ID):
 GRAPH = "https://graph.facebook.com/v21.0"
 MIN_HOURS_BETWEEN_POSTS = 30  # every-2-days cadence that tolerates any post-time-of-day vs fixed daily cron
 
-TELEGRAM_URL = "http://91.98.147.211:9090/send/telegram"
-TELEGRAM_AUTH = "bf71c2011c1405018890ad934d2b6d3e16da728761dd1aaf6a38e42835a7da4d"
+BRIDGE_AUTH = "bf71c2011c1405018890ad934d2b6d3e16da728761dd1aaf6a38e42835a7da4d"
+WHATSAPP_RECIPIENT = "+491621811123"
 TELEGRAM_CHAT = "1051747418"
 
+WHATSAPP_IMAGE_ENDPOINTS = [
+    "http://91.98.147.211:9090/send/whatsapp-image",
+    "http://91.98.147.211:80/send/whatsapp-image",
+]
+TELEGRAM_ENDPOINTS = [
+    "http://91.98.147.211:9090/send/telegram",
+    "http://91.98.147.211:80/send/telegram",
+]
 
-def notify(text: str) -> None:
-    """Best-effort push to Clarence's Telegram. Never raises."""
-    try:
-        requests.post(
-            TELEGRAM_URL,
-            headers={"Authorization": f"Bearer {TELEGRAM_AUTH}", "Content-Type": "application/json"},
-            json={"to": TELEGRAM_CHAT, "message": text},
-            timeout=15,
-        )
-    except Exception as e:
-        print(f"notify failed (non-fatal): {e}")
+STATUS_IMAGE_PROMPTS = {
+    "success": "Minimalist flat icon: a single bold green checkmark centred on a clean white background, vector style, no text.",
+    "skip":    "Minimalist flat icon: a single grey pause symbol centred on a clean white background, vector style, no text.",
+    "failure": "Minimalist flat icon: a bold red warning triangle with an exclamation mark centred on a clean white background, vector style, no text.",
+}
+
+
+def notify(text: str, kind: str = "success") -> None:
+    """Push notification to WhatsApp (image+caption) and Telegram. Best-effort."""
+    headers = {"Authorization": f"Bearer {BRIDGE_AUTH}", "Content-Type": "application/json"}
+    image_prompt = STATUS_IMAGE_PROMPTS.get(kind, STATUS_IMAGE_PROMPTS["success"])
+
+    wa_body = {"to": WHATSAPP_RECIPIENT, "caption": text, "imagePrompt": image_prompt}
+    for url in WHATSAPP_IMAGE_ENDPOINTS:
+        try:
+            r = requests.post(url, headers=headers, json=wa_body, timeout=120)
+            print(f"notify WhatsApp {url} -> {r.status_code}")
+            if r.ok:
+                break
+        except Exception as e:
+            print(f"notify WhatsApp {url} failed: {e}")
+
+    for url in TELEGRAM_ENDPOINTS:
+        try:
+            r = requests.post(url, headers=headers, json={"to": TELEGRAM_CHAT, "message": text}, timeout=15)
+            print(f"notify Telegram {url} -> {r.status_code}")
+            if r.ok:
+                break
+        except Exception as e:
+            print(f"notify Telegram {url} failed: {e}")
 
 # Fixed reference date so post_index is stable across runs.
 POST_INDEX_REF_DATE = date(2026, 4, 22)
@@ -180,7 +207,10 @@ def main() -> None:
         age_h = (now - last).total_seconds() / 3600
         if age_h < MIN_HOURS_BETWEEN_POSTS:
             print(f"[{BRAND}] SKIP — last post {age_h:.1f}h ago (< {MIN_HOURS_BETWEEN_POSTS}h)")
-            notify(f"⏭ {BRAND} skip — last post {age_h:.1f}h ago (waiting for {MIN_HOURS_BETWEEN_POSTS}h)")
+            notify(
+                f"⏭ Autopost {BRAND}: SKIP\nletzter Post war vor {age_h:.1f}h (Mindestabstand {MIN_HOURS_BETWEEN_POSTS}h). Nächster Versuch morgen 08:00 Berlin.",
+                kind="skip",
+            )
             return
         print(f"[{BRAND}] Last post {age_h:.1f}h ago — proceeding.")
     else:
@@ -205,8 +235,7 @@ def main() -> None:
             output_path=img,
         )
         if not ok or not img.exists() or img.stat().st_size == 0:
-            print(f"[{BRAND}] ERROR: image generation failed")
-            sys.exit(1)
+            raise RuntimeError("image generation failed (Gemini returned no usable image)")
         print(f"[{BRAND}] Image OK ({img.stat().st_size} bytes)")
 
         print(f"[{BRAND}] Generating captions...")
@@ -226,20 +255,26 @@ def main() -> None:
 
     print(f"\n[{BRAND}] SUCCESS fb_post_id={fb_res.get('post_id')} ig_media_id={ig_res.get('id')}")
     notify(
-        f"✅ {BRAND} posted to FB+IG\n"
-        f"audience: {audience}\n"
-        f"content: {content_type}\n"
-        f"fb: {fb_res.get('post_id')}\n"
-        f"ig: {ig_res.get('id')}"
+        f"✅ Autopost {BRAND}: ERFOLG\n"
+        f"FB + IG live. Zielgruppe: {audience}. Content: {content_type}.\n"
+        f"FB: {fb_res.get('post_id')}\n"
+        f"IG: {ig_res.get('id')}",
+        kind="success",
     )
 
 
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
+    except BaseException as e:
         import traceback
         tb = traceback.format_exc()
         print(tb)
-        notify(f"❌ {BRAND} autopost FAILED\n{type(e).__name__}: {e}\n\n{tb[-1500:]}")
+        try:
+            notify(
+                f"❌ Autopost {BRAND}: FEHLER\n{type(e).__name__}: {e}\n\n{tb[-1200:]}",
+                kind="failure",
+            )
+        except Exception:
+            pass
         raise
