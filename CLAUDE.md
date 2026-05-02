@@ -116,7 +116,7 @@ Every Johnson caption follows this skeleton (with a different hook formula each 
 
 📍 Wir sind für Sie da im [Rhein-Neckar | Rhein-Main | Rhein-Neckar und Rhein-Main] Raum — [name 1–3 real cities from the whitelist].
 
-👉 [CTA — WhatsApp, johnson-services.de, or "schreiben Sie uns"]
+👉 [CTA — johnson-services.de or "schreiben Sie uns"]
 
 #Entrümpelung #[Region-Tag] #[ICP-Tag] #[ContentType-Tag] #JohnsonServices
 ```

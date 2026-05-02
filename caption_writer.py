@@ -124,7 +124,7 @@ HARTE REGEL — REGIONALE VERANKERUNG (Johnson Services):
 - Für fiktive Beispiele/Social Proof: nutze realistische deutsche Vornamen + eine Stadt aus der Whitelist.
 """
         cta_block = """
-CTA: WhatsApp-Kontakt, johnson-services.de, oder 'Schreiben Sie uns'.
+CTA: johnson-services.de oder 'Schreiben Sie uns'.
 """
         voice_block = (
             "Tonalität: Empathisch, vertrauenswürdig. "
